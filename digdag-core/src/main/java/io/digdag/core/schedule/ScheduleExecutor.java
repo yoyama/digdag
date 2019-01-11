@@ -200,6 +200,7 @@ public class ScheduleExecutor
 
             Config scheduleConfig = SchedulerManager.getScheduleConfig(def);
             boolean skipOnOvertime = scheduleConfig.get("skip_on_overtime", boolean.class, false);
+            boolean waitUntilLastSchedule = scheduleConfig.get("wait_until_last_schedule", boolean.class, false);
             Optional<DurationParam> skipDelay = scheduleConfig.getOptional("skip_delayed_by", DurationParam.class);
 
             // task should run at scheduled time within skipDelay.
@@ -210,6 +211,10 @@ public class ScheduleExecutor
             else if (!activeAttempts.isEmpty() && skipOnOvertime) {
                 logger.info("An attempt of the scheduled workflow is still running and skip_on_overtime = true. Skipping this schedule: {}", sched);
                 nextSchedule = sr.nextScheduleTime(sched.getNextScheduleTime());
+            }
+            else if (!activeAttempts.isEmpty() && waitUntilLastSchedule) {
+                logger.info("An attempt of the scheduled workflow is still running and wait_until_last_schedule = true. Delay this schedule: {}", sched);
+                nextSchedule = ScheduleTime.of(sched.getNextScheduleTime(), ScheduleTime.alignedNow().plusSeconds(60));
             }
             else {
                 try {
