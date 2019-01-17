@@ -179,6 +179,41 @@ public class ScheduleExecutor
         }
     }
 
+    /**
+     * Check last session status to permit run of next session.
+     * @param sched
+     * @param ss
+     * @param requireSuccess  true:last session must finish successfully
+     * @return  true: permit to run next session
+     */
+    @VisibleForTesting
+    private boolean checkLastSessionStatus(StoredSchedule sched, SessionStore ss, boolean requireSuccess)
+    {
+        try {
+            Optional<Instant> lastSessionTime = sched.getLastSessionTime();
+            if (!lastSessionTime.isPresent()) { // First session
+                return true;
+            }
+            else {
+                StoredWorkflowDefinitionWithProject def = rm.getWorkflowDetailsById(sched.getWorkflowDefinitionId());
+                StoredSessionAttemptWithSession lastAttempt = ss.getLastAttemptByName(def.getProject().getId(), def.getName(), lastSessionTime.get());
+                if (requireSuccess && lastAttempt.getStateFlags().isSuccess()) {
+                    return true;
+                }
+                else if (!requireSuccess && lastAttempt.getStateFlags().isDone()) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+        }
+        catch(ResourceNotFoundException rnfe){
+            logger.warn("No last session: {}", rnfe);
+            return false;
+        }
+    }
+
     private void runSchedule(ScheduleControl lockedSched, Instant now)
     {
         StoredSchedule sched = lockedSched.get();
@@ -201,6 +236,7 @@ public class ScheduleExecutor
             Config scheduleConfig = SchedulerManager.getScheduleConfig(def);
             boolean skipOnOvertime = scheduleConfig.get("skip_on_overtime", boolean.class, false);
             boolean waitUntilLastSchedule = scheduleConfig.get("wait_until_last_schedule", boolean.class, false);
+            boolean waitUntilLastScheduleSucceed = scheduleConfig.get("wait_until_last_schedule_succeed", boolean.class, false);
             Optional<DurationParam> skipDelay = scheduleConfig.getOptional("skip_delayed_by", DurationParam.class);
 
             // task should run at scheduled time within skipDelay.
@@ -212,8 +248,12 @@ public class ScheduleExecutor
                 logger.info("An attempt of the scheduled workflow is still running and skip_on_overtime = true. Skipping this schedule: {}", sched);
                 nextSchedule = sr.nextScheduleTime(sched.getNextScheduleTime());
             }
-            else if (!activeAttempts.isEmpty() && waitUntilLastSchedule) {
-                logger.info("An attempt of the scheduled workflow is still running and wait_until_last_schedule = true. Delay this schedule: {}", sched);
+            else if (waitUntilLastSchedule && !checkLastSessionStatus(sched, ss, false)) {
+                logger.info("wait_until_last_schedule = true. and last schedule has not yet finished. Delay this schedule: {}", sched);
+                nextSchedule = ScheduleTime.of(sched.getNextScheduleTime(), ScheduleTime.alignedNow().plusSeconds(60));
+            }
+            else if (waitUntilLastScheduleSucceed && !checkLastSessionStatus(sched, ss, true)) {
+                logger.info("wait_until_last_schedule_succeed = true and last schedule has not yet finished successfully. Delay this schedule: {}", sched);
                 nextSchedule = ScheduleTime.of(sched.getNextScheduleTime(), ScheduleTime.alignedNow().plusSeconds(60));
             }
             else {
