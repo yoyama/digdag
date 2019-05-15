@@ -1,6 +1,7 @@
 package io.digdag.spi.ac;
 
 import io.digdag.spi.AuthenticatedUser;
+import io.digdag.spi.RequestInfo;
 
 public interface AccessController
 {
@@ -420,4 +421,11 @@ public interface AccessController
      */
     void checkEnableSchedule(WorkflowTarget target, AuthenticatedUser user)
             throws AccessControlException;
+
+    /**
+     * Confirm result of listing tasks of an attempt
+     * @param result
+     * @param user
+     */
+    void confirmListOfAttempts(ListTasksOperationResult result, AuthenticatedUser user, RequestInfo request);
 }

@@ -3,13 +3,20 @@ package io.digdag.server.ac;
 import io.digdag.spi.AuthenticatedUser;
 import io.digdag.spi.ac.AccessControlException;
 import io.digdag.spi.ac.AccessController;
+import io.digdag.spi.ac.ListTasksOperationResult;
 import io.digdag.spi.ac.ProjectTarget;
 import io.digdag.spi.ac.SiteTarget;
 import io.digdag.spi.ac.WorkflowTarget;
 
+import io.digdag.spi.RequestInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class DefaultAccessController
         implements AccessController
 {
+    private static final Logger logger = LoggerFactory.getLogger(DefaultAccessController.class);
+
     @Override
     public void checkPutProject(ProjectTarget target, AuthenticatedUser user)
             throws AccessControlException
@@ -207,4 +214,18 @@ public class DefaultAccessController
     public void checkEnableSchedule(WorkflowTarget target, AuthenticatedUser user)
             throws AccessControlException
     { }
+
+    @Override
+    public void confirmListOfAttempts(ListTasksOperationResult result, AuthenticatedUser user, RequestInfo request)
+    {
+        logger.info(String.format(
+                "id:<ID> ip_address:%s request_http_verb:%s request_path_info:%s " +
+                "resource_type:%s resource_id:%s resource_name:%s " +
+                "account_id:%d user_id:%s user_email:%s",
+                request.getIpAddress(), request.getMethod(), request.getPathInfo(),
+                "get_attempt_tasks", result.getAttemptId(), "",
+                user.getSiteId(), user.getUserInfo().get("id", String.class, ""),
+                user.getUserInfo().get("email", String.class, "")
+                ));
+    }
 }

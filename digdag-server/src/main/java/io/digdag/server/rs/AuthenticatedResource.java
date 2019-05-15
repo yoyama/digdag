@@ -3,6 +3,8 @@ package io.digdag.server.rs;
 import com.google.common.base.Supplier;
 import io.digdag.client.config.Config;
 import io.digdag.spi.AuthenticatedUser;
+import io.digdag.spi.ImmutableRequestInfo;
+import io.digdag.spi.RequestInfo;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Context;
@@ -38,5 +40,16 @@ public abstract class AuthenticatedResource
     protected Supplier<Map<String, String>> getSecrets()
     {
         return (Supplier<Map<String, String>>) request.getAttribute("secrets");
+    }
+
+
+    protected RequestInfo getRequestInfo()
+    {
+        RequestInfo requestInfo = ImmutableRequestInfo.builder()
+                .ipAddress(request.getRemoteAddr())
+                .pathInfo(request.getPathInfo())
+                .method(request.getMethod())
+                .build();
+        return requestInfo;
     }
 }

@@ -1,5 +1,6 @@
 package io.digdag.server.rs;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
@@ -32,11 +33,15 @@ import io.digdag.client.config.ConfigFactory;
 import io.digdag.client.api.*;
 import io.digdag.spi.ac.AccessControlException;
 import io.digdag.spi.ac.AccessController;
+import io.digdag.spi.AuthenticatedUser;
 import io.digdag.spi.ScheduleTime;
+import io.digdag.spi.ac.ImmutableListTasksOperationResult;
+import io.digdag.spi.ac.ListTasksOperationResult;
 import io.digdag.spi.ac.ProjectTarget;
 import io.digdag.spi.ac.SiteTarget;
 import io.digdag.spi.ac.WorkflowTarget;
 import io.swagger.annotations.Api;
+import jdk.nashorn.internal.ir.annotations.Immutable;
 
 @Api("Attempt")
 @Path("/")
@@ -100,6 +105,7 @@ public class AttemptResource
     {
         int validPageSize = QueryParamValidator.validatePageSize(Optional.fromNullable(pageSize), MAX_ATTEMPTS_PAGE_SIZE, DEFAULT_ATTEMPTS_PAGE_SIZE);
         return tm.<RestSessionAttemptCollection, ResourceNotFoundException, AccessControlException>begin(() -> {
+            AuthenticatedUser authUser = getAuthenticatedUser();
             List<StoredSessionAttemptWithSession> attempts;
 
             ProjectStore rs = rm.getProjectStore(getSiteId());
@@ -138,6 +144,7 @@ public class AttemptResource
                                 siteTarget,
                                 getAuthenticatedUser()));
             }
+
 
             return RestModels.attemptCollection(rm.getProjectStore(getSiteId()), attempts);
         }, ResourceNotFoundException.class, AccessControlException.class);
@@ -195,12 +202,28 @@ public class AttemptResource
             final StoredProject proj = rm.getProjectStore(getSiteId())
                     .getProjectById(attempt.getSession().getProjectId()); // NotFound
 
+            WorkflowTarget wfTarget = WorkflowTarget.of(getSiteId(), proj.getName(), attempt.getSession().getWorkflowName());
             ac.checkGetTasksFromAttempt( // AccessControl
-                    WorkflowTarget.of(getSiteId(), proj.getName(), attempt.getSession().getWorkflowName()),
+                    wfTarget,
                     getAuthenticatedUser());
 
             List<ArchivedTask> tasks = sm.getSessionStore(getSiteId())
                     .getTasksOfAttempt(id);
+
+            //AuditLogInfo auditLog = AuditLogInfo.builder(request, authUser)
+            //        .resourceType("get_attempt_tasks")
+            //        .resourceId("???")
+            //        .resourceName("???")
+            //        .build();
+            //ac.sendAuditLog(auditLog);
+            //ListAttemptsResult result;
+            // ac.confirmListOfAttempts(result, authUser, requestInfo);
+            ListTasksOperationResult result = ImmutableListTasksOperationResult.builder()
+                    .addAllTaskNames(Arrays.asList())
+                    .workflowTarget(wfTarget)
+                    .attemptId(Long.toString(id))
+                    .build();
+            ac.confirmListOfAttempts(result, getAuthenticatedUser(), getRequestInfo());
             return RestModels.taskCollection(tasks);
         }, ResourceNotFoundException.class, AccessControlException.class);
     }
