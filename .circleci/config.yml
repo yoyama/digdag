@@ -89,6 +89,7 @@ workflows:
               only:
                 - master
                 - v0_10
+                - decouple
       - docs_deployment: # master branch only
           filters:
             branches:
