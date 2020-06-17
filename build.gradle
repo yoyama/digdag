@@ -92,6 +92,7 @@ allprojects {
     }
 }
 
+
 subprojects {
     apply plugin: 'maven'
     apply plugin: 'com.github.spotbugs'
@@ -127,7 +128,13 @@ subprojects {
         jacksonVersion = "2.9.10"
         jacksonDatabindVersion = "2.9.10"
         awsJavaSdkVersion = "1.11.545"
-        guavaVersion = "19.0"
+        guavaVersion = "25.1-jre"
+    }
+
+    configurations.all {
+        resolutionStrategy {
+            force "com.google.guava:guava:${guavaVersion}"
+        }
     }
 
     tasks.withType(JavaCompile) {
