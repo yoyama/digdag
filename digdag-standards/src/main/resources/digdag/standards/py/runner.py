@@ -5,6 +5,10 @@ import types
 import inspect
 import collections
 import traceback
+import _thread
+import time
+import tracemalloc
+
 
 command = sys.argv[1]
 in_file = sys.argv[2]
@@ -140,12 +144,36 @@ def digdag_inspect_arguments(callable_type, exclude_self, params):
     else:
         return args
 
+def digdag_memory_profile_thread(delay, top_n):
+    tracemalloc.start(top_n)
+    time1 = tracemalloc.take_snapshot()
+    while True:
+        time.sleep(delay)
+        time2 = tracemalloc.take_snapshot()
+        stats = time2.compare_to(time1, 'lineno')
+        stats_filtered = [s for s in stats[:top_n] if "tracemalloc.py" not in str(s)] # exclude tracemalloc
+        for stat in stats_filtered:
+            print(stat)
+        time1 = time2
+
+def digdag_memory_profile(delay, top_n):
+    try:
+        if monitor_thread is not None:
+            monitor_thread = _thread.start_new_thread(digdag_memory_profile_thread, (delay, top_n))
+        else:
+            print("A monitor thread exists. Skipped.")
+    except Exception as e:
+        print("Error: unable to start thread")
+        print(e)
+
+
 error = None
 error_message = None
 error_value = None
 error_traceback = None
 callable_type = None
 method_name = None
+monitor_thread = None
 
 try:
     callable_type, method_name = digdag_inspect_command(command)
